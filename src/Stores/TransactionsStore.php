@@ -43,7 +43,7 @@ class TransactionsStore extends Store
      */
     public function fetch($name)
     {
-        return $this->store[$name] ?: null;
+        return isset($this->store[$name]) ? $this->store[$name] : null;
     }
 
     /**

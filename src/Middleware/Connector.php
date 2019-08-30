@@ -3,11 +3,8 @@
 namespace PhilKra\Middleware;
 
 use PhilKra\Agent;
-use PhilKra\Stores\ErrorsStore;
+use PhilKra\Events\EventBean;
 use PhilKra\Stores\TransactionsStore;
-use PhilKra\Serializers\Errors;
-use PhilKra\Serializers\Transactions;
-use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Client;
 
 /**
@@ -30,52 +27,89 @@ class Connector
     private $client;
 
     /**
+     * @var array
+     */
+    private $payload = [];
+
+    /**
      * @param \PhilKra\Helper\Config $config
      */
-    public function __construct(\PhilKra\Helper\Config $config)
+    public function __construct($config)
     {
         $this->config = $config;
-        $this->client = new Client();
+        $this->configureHttpClient();
     }
 
     /**
-     * Push the Transactions to APM Server
-     *
-     * @param \PhilKra\Stores\TransactionsStore $store
+     * Is the Payload Queue populated?
      *
      * @return bool
      */
-    public function sendTransactions(TransactionsStore $store)
+    public function isPayloadSet()
     {
-        $request = new Request(
-            'POST',
-            $this->getEndpoint('transactions'),
-            $this->getRequestHeaders(),
-            json_encode(new Transactions($this->config, $store))
-        );
+        return (empty($this->payload) === false);
+    }
 
-        $response = $this->client->send($request);
+    /**
+     * Create and configure the HTTP client
+     *
+     * @return void
+     */
+    private function configureHttpClient()
+    {
+        $httpClientDefaults = [
+            'timeout' => $this->config->get('timeout'),
+        ];
+
+        $httpClientConfig = $this->config->get('httpClient');
+
+        if ( ! isset($httpClientConfig)) {
+            $httpClientConfig = [];
+        }
+
+        $this->client = new Client(array_merge($httpClientDefaults, $httpClientConfig));
+    }
+
+    /**
+     * Put Events to the Payload Queue
+     */
+    public function putEvent($event)
+    {
+        $this->payload[] = json_encode($event);
+    }
+
+    /**
+     * Commit the Events to the APM server
+     *
+     * @return bool
+     */
+    public function commit()
+    {
+        $body = '';
+        foreach($this->payload as $line) {
+            $body .= $line . "\n";
+        }
+        $this->payload = [];
+        $response = $this->client->post($this->getEndpoint(), [
+            'headers' => $this->getRequestHeaders(),
+            'body'    => $body,
+        ]);
         return ($response->getStatusCode() >= 200 && $response->getStatusCode() < 300);
     }
 
     /**
-     * Push the Errors to APM Server
+     * Get the Server Informations
      *
-     * @param \PhilKra\Stores\ErrorsStore $store
+     * @link https://www.elastic.co/guide/en/apm/server/7.3/server-info.html
      *
-     * @return bool
+     * @return Response
      */
-    public function sendErrors(ErrorsStore $store)
+    public function getInfo()
     {
-        $request = new Request(
-            'POST',
-            $this->getEndpoint('errors'),
-            $this->getRequestHeaders(),
-            json_encode(new Errors($this->config, $store))
+        return $this->client->get(
+            $this->config->get('serverUrl'),
+            ['headers' => $this->getRequestHeaders(),]
         );
-
-        $response = $this->client->send($request);
-        return ($response->getStatusCode() >= 200 && $response->getStatusCode() < 300);
     }
 
     /**
@@ -85,14 +119,9 @@ class Connector
      *
      * @return string
      */
-    private function getEndpoint($endpoint)
+    private function getEndpoint()
     {
-        return sprintf(
-            '%s/%s/%s',
-            $this->config->get('serverUrl'),
-            $this->config->get('apmVersion'),
-            $endpoint
-        );
+        return sprintf('%s/intake/v2/events', $this->config->get('serverUrl'));
     }
 
     /**
@@ -104,8 +133,9 @@ class Connector
     {
         // Default Headers Set
         $headers = [
-            'Content-Type' => 'application/json',
-            'User-Agent'   => sprintf('elasticapm-php/%s', Agent::VERSION),
+            'Content-Type' => 'application/x-ndjson',
+            'User-Agent'   => sprintf('elastic-apm-php/%s', Agent::VERSION),
+            'Accept'       => 'application/json',
         ];
 
         // Add Secret Token to Header
@@ -115,4 +145,5 @@ class Connector
 
         return $headers;
     }
+
 }
