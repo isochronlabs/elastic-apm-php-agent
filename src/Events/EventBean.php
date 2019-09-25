@@ -2,26 +2,48 @@
 
 namespace PhilKra\Events;
 
-use Ramsey\Uuid\Uuid;
-
 /**
  *
- * EventBean for occuring events such as Excpetions or Transactions
+ * EventBean for occurring events such as Exceptions or Transactions
  *
  */
 class EventBean
 {
     /**
-     * UUID
+     * Bit Size of ID's
+     */
+    const
+        EVENT_ID_BITS  = 64,
+        TRACE_ID_BITS = 128;
+
+    /**
+     * Event Id
      *
      * @var string
      */
     private $id;
 
     /**
-     * Error occurred on Timestamp
+     * Id of the whole trace forest and is used to uniquely identify a distributed trace through a system
+     * @link https://www.w3.org/TR/trace-context/#trace-id
      *
      * @var string
+     */
+    private $traceId;
+
+    /**
+     * Id of parent span or parent transaction
+     *
+     * @link https://www.w3.org/TR/trace-context/#parent-id
+     *
+     * @var string
+     */
+    private $parentId = null;
+
+    /**
+     * Error occurred on Timestamp
+     *
+     * @var float
      */
     private $timestamp;
 
@@ -41,8 +63,10 @@ class EventBean
      * @var array
      */
     private $contexts = [
+        'request'  => [],
         'user'     => [],
         'custom'   => [],
+        'env'      => [],
         'tags'     => [],
         'response' => [
             'finished'     => true,
@@ -57,19 +81,23 @@ class EventBean
      * @link https://github.com/philkra/elastic-apm-php-agent/issues/3
      *
      * @param array $contexts
+     * @param ?Transaction $parent
      */
-    public function __construct(array $contexts)
+    public function __construct($contexts, $parent = null)
     {
-        // Generate Random UUID
-        $this->id = Uuid::uuid4()->toString();
+        // Generate Random Event Id
+        $this->id = self::generateRandomBitsInHex(self::EVENT_ID_BITS);
 
         // Merge Initial Context
         $this->contexts = array_merge($this->contexts, $contexts);
 
-        // Get UTC timestamp of Now
-        $timestamp = \DateTime::createFromFormat('U.u', sprintf('%.6F', microtime(true)));
-        $timestamp->setTimeZone(new \DateTimeZone('UTC'));
-        $this->timestamp = $timestamp->format('Y-m-d\TH:i:s.u\Z');
+        // Get current Unix timestamp with seconds
+        $this->timestamp = round(microtime(true) * 1000000);
+
+        // Set Parent Transaction
+        if ($parent !== null) {
+            $this->setParent($parent);
+        }
     }
 
     /**
@@ -83,13 +111,66 @@ class EventBean
     }
 
     /**
+     * Get the Trace Id
+     *
+     * @return string $traceId
+     */
+    public function getTraceId()
+    {
+        return $this->traceId;
+    }
+
+    /**
+     * Set the Trace Id
+     *
+     * @param string $traceId
+     */
+    final public function setTraceId($traceId)
+    {
+        $this->traceId = $traceId;
+    }
+
+    /**
+     * Set the Parent Id
+     *
+     * @param string $parentId
+     */
+    final public function setParentId($parentId)
+    {
+        $this->parentId = $parentId;
+    }
+
+    /**
+     * Get the Parent Id
+     *
+     * @return string $parentId
+     */
+    final public function getParentId()
+    {
+        return $this->parentId;
+    }
+
+    /**
      * Get the Event's Timestamp
      *
-     * @return string
+     * @return int
      */
     public function getTimestamp()
     {
         return $this->timestamp;
+    }
+
+    /**
+     * Set the Parent Id and Trace Id
+     *
+     * @link https://www.elastic.co/guide/en/apm/server/current/transaction-api.html
+     *
+     * @param Transaction $parent
+     */
+    public function setParent($parent)
+    {
+        $this->parentId = $parent->getId();
+        $this->setTraceId($parent->getTraceId());
     }
 
     /**
@@ -99,7 +180,7 @@ class EventBean
      *
      * @return void
      */
-    final public function setMeta(array $meta)
+    final public function setMeta($meta)
     {
         $this->meta = array_merge($this->meta, $meta);
     }
@@ -109,7 +190,7 @@ class EventBean
      *
      * @param array $userContext
      */
-    final public function setUserContext(array $userContext)
+    final public function setUserContext($userContext)
     {
         $this->contexts['user'] = array_merge($this->contexts['user'], $userContext);
     }
@@ -119,7 +200,7 @@ class EventBean
      *
      * @param array $customContext
      */
-    final public function setCustomContext(array $customContext)
+    final public function setCustomContext($customContext)
     {
         $this->contexts['custom'] = array_merge($this->contexts['custom'], $customContext);
     }
@@ -129,7 +210,7 @@ class EventBean
      *
      * @param array $response
      */
-    final public function setResponse(array $response)
+    final public function setResponse($response)
     {
         $this->contexts['response'] = array_merge($this->contexts['response'], $response);
     }
@@ -139,9 +220,78 @@ class EventBean
      *
      * @param array $tags
      */
-    final public function setTags(array $tags)
+    final public function setTags($tags)
     {
         $this->contexts['tags'] = array_merge($this->contexts['tags'], $tags);
+    }
+
+    /**
+     * Set Transaction Request
+     *
+     * @param array $request
+     */
+    final public function setRequest($request)
+    {
+        $this->contexts['request'] = array_merge($this->contexts['request'], $request);
+    }
+
+    /**
+     * Generate request data
+     *
+     * @return array
+     */
+    final public function generateRequest()
+    {
+        $headers = getallheaders();
+        $http_or_https = isset($_SERVER['HTTPS']) ? 'https' : 'http';
+        $http_version = null;
+        if (isset($_SERVER['SERVER_PROTOCOL'])) {
+            $SERVER_PROTOCOL = $_SERVER['SERVER_PROTOCOL'] ?: '';
+            $http_version = substr($SERVER_PROTOCOL, strpos($SERVER_PROTOCOL, '/'));
+        }
+
+        // Build Context Stub
+        $SERVER_PROTOCOL = isset($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : '';
+        $remote_address = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '';
+        if (array_key_exists('HTTP_X_FORWARDED_FOR', $_SERVER) === true) {
+            $remote_address = $_SERVER['HTTP_X_FORWARDED_FOR'];
+        }
+
+        return [
+            'http_version' => substr($SERVER_PROTOCOL, strpos($SERVER_PROTOCOL, '/')),
+            'method'       => isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'cli',
+            'socket'       => [
+                'remote_address' => $remote_address,
+                'encrypted'      => isset($_SERVER['HTTPS'])
+            ],
+            'response' => $this->contexts['response'],
+            'url'          => [
+                'protocol' => $http_or_https,
+                'hostname' => isset($_SERVER['SERVER_NAME']) ? $_SERVER['SERVER_NAME'] : '',
+                'port'     => isset($_SERVER['SERVER_PORT']) ? $_SERVER['SERVER_PORT'] : 0,
+                'pathname' => isset($_SERVER['SCRIPT_NAME']) ? $_SERVER['SCRIPT_NAME'] : '',
+                'search'   => isset($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '',
+                'full' => isset($_SERVER['HTTP_HOST']) ? $http_or_https . '://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'] : '',
+            ],
+            'headers' => [
+                'user-agent' => isset($headers['User-Agent']) ? $headers['User-Agent'] : '',
+                'cookie'     => $this->getCookieHeader(isset($headers['Cookie']) ? $headers['Cookie'] : ''),
+            ],
+            'env' => (object)$this->getEnv(),
+            'cookies' => (object)$this->getCookies(),
+        ];
+    }
+
+    /**
+     * Generate random bits in hexadecimal representation
+     *
+     * @param int $bits
+     * @return string
+     * @throws \Exception
+     */
+    final protected function generateRandomBitsInHex($bits)
+    {
+        return bin2hex(openssl_random_pseudo_bytes($bits/8));
     }
 
     /**
@@ -165,6 +315,56 @@ class EventBean
     }
 
     /**
+     * Get the Environment Variables
+     *
+     * @link http://php.net/manual/en/reserved.variables.server.php
+     * @link https://github.com/philkra/elastic-apm-php-agent/issues/27
+     * @link https://github.com/philkra/elastic-apm-php-agent/issues/54
+     *
+     * @return array
+     */
+    final protected function getEnv()
+    {
+        $envMask = $this->contexts['env'];
+        $env = empty($envMask)
+            ? $_SERVER
+            : array_intersect_key($_SERVER, array_flip($envMask));
+
+        return $env;
+    }
+
+    /**
+     * Get the cookies
+     *
+     * @link https://github.com/philkra/elastic-apm-php-agent/issues/30
+     * @link https://github.com/philkra/elastic-apm-php-agent/issues/54
+     *
+     * @return array
+     */
+    final protected function getCookies()
+    {
+        $cookieMask = isset($this->contexts['cookies']) ? $this->contexts['cookies'] : [];
+        return empty($cookieMask)
+            ? $_COOKIE
+            : array_intersect_key($_COOKIE, array_flip($cookieMask));
+    }
+
+    /**
+     * Get the cookie header
+     *
+     * @link https://github.com/philkra/elastic-apm-php-agent/issues/30
+     *
+     * @return string
+     */
+    final protected function getCookieHeader($cookieHeader)
+    {
+        $cookieMask = isset($this->contexts['cookies']) ? $this->contexts['cookies'] : [];
+
+        // Returns an empty string if cookies are masked.
+        return empty($cookieMask) ? $cookieHeader : '';
+    }
+
+    /**
      * Get the Events Context
      *
      * @link https://www.elastic.co/guide/en/apm/server/current/transaction-api.html#transaction-context-schema
@@ -173,44 +373,9 @@ class EventBean
      */
     final protected function getContext()
     {
-        $headers = getallheaders();
-        $http_or_https = isset($_SERVER['HTTPS']) ? 'https' : 'http';
-        $http_version = null;
-        if (isset($_SERVER['SERVER_PROTOCOL'])) {
-            $SERVER_PROTOCOL = $_SERVER['SERVER_PROTOCOL'] ?: '';
-            $http_version = substr($SERVER_PROTOCOL, strpos($SERVER_PROTOCOL, '/'));
-        }
-
-        // Build Context Stub
-        $context         = [
-            'request' => [
-                'http_version' => $http_version,
-                'method'       => $_SERVER['REQUEST_METHOD'] ?: 'cli',
-                'socket'       => [
-                    'remote_address' => $_SERVER['REMOTE_ADDR'] ?: '',
-                    'encrypted'      => isset($_SERVER['HTTPS'])
-                ],
-                'response' => $this->contexts['response'],
-                'url'          => [
-                    'protocol' => $http_or_https,
-                    'hostname' => $_SERVER['SERVER_NAME'] ?: '',
-                    'port'     => $_SERVER['SERVER_PORT'] ?: '',
-                    'pathname' => $_SERVER['SCRIPT_NAME'] ?: '',
-                    'search'   => '?' . (($_SERVER['QUERY_STRING'] ?: '') ?: ''),
-                    'full' => $http_or_https . '://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']
-                ],
-                'headers' => [
-                    'user-agent' => $headers['User-Agent'] ?: '',
-                    'cookie'     => $headers['Cookie'] ?: ''
-                ],
-                'env' => $_SERVER,
-            ]
+        $context = [
+            'request' => empty($this->contexts['request']) ? $this->generateRequest() : $this->contexts['request']
         ];
-
-        // Add Cookies Map
-        if (empty($_COOKIE) === false) {
-            $context['request']['cookies'] = $_COOKIE;
-        }
 
         // Add User Context
         if (empty($this->contexts['user']) === false) {
