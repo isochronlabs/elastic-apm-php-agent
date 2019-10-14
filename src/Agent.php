@@ -110,7 +110,7 @@ class Agent
      *
      * @return Transaction
      */
-    public function startTransaction(string $name): Transaction
+    public function startTransaction(string $name)
     {
         // Create and Store Transaction
         $this->transactionsStore->register(new Transaction($name, $this->sharedContext));
@@ -176,7 +176,7 @@ class Agent
      *
      * @return \PhilKra\Helper\Config
      */
-    public function getConfig() : \PhilKra\Helper\Config
+    public function getConfig()
     {
         return $this->config;
     }
@@ -186,7 +186,7 @@ class Agent
      *
      * @return bool
      */
-    public function send() : bool
+    public function send()
     {
         // Is the Agent enabled ?
         if ($this->config->get('active') === false) {
