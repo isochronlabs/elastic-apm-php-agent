@@ -1,47 +1,39 @@
 {
 	"name": "surveygizmo/elastic-apm-php-agent",
 	"description": "A php 5.6 agent for Elastic APM",
-    "license": "MIT",
-    "require" : {
+	"license": "MIT",
+	"require": {
 		"php": "7.3.*",
-        "guzzlehttp/guzzle": "6.*",
+		"guzzlehttp/guzzle": "6.*",
         "ralouphie/getallheaders": "3.*",
         "ext-curl" : "*",
         "ext-json": "*"
-    },
-    "require-dev" : {
+	},
+	"require-dev": {
 		"phpunit/phpunit": "*"
-    },
-    "suggest": {
-        "ext-xdebug": "Required for processing of request headers"
-    },
-    "autoload" : {
-        "psr-4" : {
-            "PhilKra\\": "src/"
-        }
-    },
-    "autoload-dev": {
-        "psr-4": {
-            "PhilKra\\Tests\\": "tests/"
-        }
-    },
-    "config" : {
-        "optimize-autoloader" : true
-    },
-    "authors" : [
-        {
-            "name" : "Philip Krauss",
-            "email" : "philip@philipkrauss.at",
-            "homepage" : "https://github.com/philkra"
-        },
-        {
-            "name" : "George Boot",
-            "email": "george@entryninja.com"
-        },
-        {
-            "name" : "Mohamed Al Ashaal",
-            "email" : "mohamed.alashaal@speakol.com",
-            "homepage" : "https://github.com/speakol-ads"
-        }
-    ]
+	},
+	"suggest": {
+		"ext-xdebug": "Required for processing of request headers"
+	},
+	"autoload": {
+		"psr-4": {
+			"PhilKra\\": "src/"
+		}
+	},
+	"autoload-dev": {
+		"psr-4": {
+			"PhilKra\\Tests\\": "tests/"
+		}
+	},
+	"config": {
+		"optimize-autoloader": true
+	},
+	"authors": [{
+		"name": "Philip Krauss",
+		"email": "philip@philipkrauss.at",
+		"homepage": "https://github.com/philkra/elastic-apm-agent-php"
+	}, {
+		"name": "George Boot",
+		"email": "george@entryninja.com"
+	}]
 }

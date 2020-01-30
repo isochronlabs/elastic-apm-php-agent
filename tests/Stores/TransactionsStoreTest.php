@@ -3,7 +3,8 @@ namespace PhilKra\Tests\Stores;
 
 use \PhilKra\Stores\TransactionsStore;
 use \PhilKra\Events\Transaction;
-use PhilKra\Tests\TestCase;
+use \PhilKra\Exception\Transaction\DuplicateTransactionNameException;
+use \PHPUnit\Framework\TestCase;
 
 /**
  * Test Case for @see \PhilKra\Stores\TransactionsStore
@@ -37,14 +38,14 @@ final class TransactionsStoreTest extends TestCase {
   /**
    * @depends testTransactionRegistrationAndFetch
    *
+   * @expectedException \PhilKra\Exception\Transaction\DuplicateTransactionNameException
+   *
    * @covers \PhilKra\Stores\TransactionsStore::register
    */
   public function testDuplicateTransactionRegistration() {
     $store = new TransactionsStore();
     $name  = 'test';
     $trx   = new Transaction( $name, [] );
-
-    $this->expectException( \PhilKra\Exception\Transaction\DuplicateTransactionNameException::class );
 
     // Store the Transaction again to force an Exception
     $store->register( $trx );

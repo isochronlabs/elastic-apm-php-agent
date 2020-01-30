@@ -2,7 +2,8 @@
 namespace PhilKra\Tests\Helper;
 
 use \PhilKra\Agent;
-use PhilKra\Tests\TestCase;
+use \PhilKra\Helper\Config;
+use \PHPUnit\Framework\TestCase;
 
 /**
  * Test Case for @see \PhilKra\Helper\Config
@@ -28,24 +29,18 @@ final class ConfigTest extends TestCase {
     $this->assertArrayHasKey( 'hostname', $config );
     $this->assertArrayHasKey( 'active', $config );
     $this->assertArrayHasKey( 'timeout', $config );
+    $this->assertArrayHasKey( 'apmVersion', $config );
     $this->assertArrayHasKey( 'appVersion', $config );
-    $this->assertArrayHasKey( 'env', $config );
-    $this->assertArrayHasKey( 'cookies', $config );
-    $this->assertArrayHasKey( 'httpClient', $config );
-    $this->assertArrayHasKey( 'environment', $config );
-    $this->assertArrayHasKey( 'backtraceLimit', $config );
+    $this->assertArrayHasKey( 'backtraceDepth', $config );
 
     $this->assertEquals( $config['appName'], $appName );
     $this->assertNull( $config['secretToken'] );
     $this->assertEquals( $config['serverUrl'], 'http://127.0.0.1:8200' );
     $this->assertEquals( $config['hostname'], gethostname() );
     $this->assertTrue( $config['active'] );
-    $this->assertEquals( $config['timeout'], 10 );
-    $this->assertEquals( $config['env'], ['SERVER_SOFTWARE'] );
-    $this->assertEquals( $config['cookies'], [] );
-    $this->assertEquals( $config['httpClient'], [] );
-    $this->assertEquals( $config['environment'], 'development' );
-    $this->assertEquals( $config['backtraceLimit'], 0 );
+    $this->assertEquals( $config['timeout'], 5 );
+    $this->assertEquals( $config['apmVersion'], 'v1' );
+    $this->assertEquals( $config['backtraceDepth'], 25 );
   }
 
   /**

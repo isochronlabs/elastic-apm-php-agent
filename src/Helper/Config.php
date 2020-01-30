@@ -35,13 +35,12 @@ class Config
      * Get Config Value
      *
      * @param string $key
-     * @param mixed $default
      *
      * @return mixed: value | null
      */
-    public function get($key, $default = null)
+    public function get($key)
     {
-        return isset($this->config[$key]) ? ($this->config[$key]) : $default;
+        return ($this->config[$key]) ?: null;
     }
 
     /**
@@ -57,24 +56,19 @@ class Config
     /**
      * Get the Default Config of the Agent
      *
-     * @link https://github.com/philkra/elastic-apm-php-agent/issues/55
-     *
      * @return array
      */
     private function getDefaultConfig()
     {
         return [
-            'serverUrl'      => 'http://127.0.0.1:8200',
             'secretToken'    => null,
-            'hostname'       => gethostname(),
+            'serverUrl'      => 'http://127.0.0.1:8200',
             'appVersion'     => '',
             'active'         => true,
-            'timeout'        => 10,
-            'env'            => ['SERVER_SOFTWARE'],
-            'cookies'        => [],
-            'httpClient'     => [],
-            'environment'    => 'development',
-            'backtraceLimit' => 0,
+            'hostname'       => gethostname(),
+            'timeout'        => 5,
+            'apmVersion'     => 'v1',
+            'backtraceDepth' => 25,
         ];
     }
 }
