@@ -3,7 +3,7 @@
 	"description": "A php 5.6 agent for Elastic APM",
     "license": "MIT",
     "require" : {
-		"php": "^7.3.*",
+		"php": "7.3.*",
         "guzzlehttp/guzzle": "6.*",
         "ralouphie/getallheaders": "3.*",
         "ext-curl" : "*",
