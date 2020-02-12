@@ -1,9 +1,9 @@
 {
-	"name": "surveygizmo/elastic-apm-php-agent",
-	"description": "A php 5.6 agent for Elastic APM",
+	"name": "isochronlabs/elastic-apm-php-agent",
+	"description": "A php 5.5 agent for Elastic APM",
     "license": "MIT",
     "require" : {
-		"php": "5.6.*",
+		"php": "5.5.*",
         "guzzlehttp/guzzle": "6.*",
         "ralouphie/getallheaders": "3.*",
         "ext-curl" : "*",
@@ -42,6 +42,10 @@
             "name" : "Mohamed Al Ashaal",
             "email" : "mohamed.alashaal@speakol.com",
             "homepage" : "https://github.com/speakol-ads"
+        },
+        {
+            "name": "Joel Larson",
+            "email": "isochronlabs@protonmail.com"
         }
     ]
 }
